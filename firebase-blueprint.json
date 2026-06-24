@@ -1,0 +1,61 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Stores basic user information and preferences.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Unique identifier for the user." },
+        "email": { "type": "string", "format": "email", "description": "User's email address." },
+        "displayName": { "type": "string", "description": "User's display name." },
+        "photoURL": { "type": "string", "format": "uri", "description": "URL to user's profile picture." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp when the user was created." }
+      },
+      "required": ["uid", "email"]
+    },
+    "Portfolio": {
+      "title": "User Portfolio",
+      "description": "Stores user's cash balance and asset positions.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Owner's UID." },
+        "cash": { "type": "number", "description": "Available cash balance." },
+        "positions": { 
+          "type": "object", 
+          "description": "Map of symbol to position details.",
+          "properties": {
+            "symbol": { "type": "string" },
+            "quantity": { "type": "number" },
+            "averageEntryPrice": { "type": "number" }
+          }
+        },
+        "isPaper": { "type": "boolean", "description": "Whether this is a paper trading account." }
+      },
+      "required": ["uid", "cash", "positions", "isPaper"]
+    },
+    "Watchlist": {
+      "title": "User Watchlist",
+      "description": "List of symbols the user is tracking.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Owner's UID." },
+        "symbols": { "type": "array", "items": { "type": "string" }, "description": "List of ticker symbols." }
+      },
+      "required": ["uid", "symbols"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "User",
+      "description": "Individual user profile documents."
+    },
+    "/portfolios/{portfolioId}": {
+      "schema": "Portfolio",
+      "description": "User portfolio documents (one per mode per user)."
+    },
+    "/watchlists/{uid}": {
+      "schema": "Watchlist",
+      "description": "User watchlist document."
+    }
+  }
+}

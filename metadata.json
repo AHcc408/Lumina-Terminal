@@ -1,0 +1,5 @@
+{
+  "name": "Lumina Pro Terminal",
+  "description": "A high-performance, Bloomberg-inspired financial terminal for professional traders. Features real-time simulated market data, keyboard-first navigation, and advanced charting.",
+  "requestFramePermissions": []
+}

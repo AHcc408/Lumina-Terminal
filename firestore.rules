@@ -1,0 +1,124 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {uid}
+    // Fields:
+    //   - uid: string (required, immutable) - User's unique ID
+    //   - email: string (required, email format) - User's email
+    //   - displayName: string (optional) - User's name
+    //   - photoURL: string (optional, url format) - Profile picture URL
+    //   - createdAt: string (required, iso-date format) - Creation timestamp
+    //
+    // Collection: portfolios
+    // Document ID: {portfolioId} (format: uid_mode)
+    // Fields:
+    //   - uid: string (required, immutable) - Owner's UID
+    //   - cash: number (required, positive) - Cash balance
+    //   - positions: map (required) - Symbol to position mapping
+    //   - isPaper: bool (required, immutable) - Account mode
+    //
+    // Collection: watchlists
+    // Document ID: {uid}
+    // Fields:
+    //   - uid: string (required, immutable) - Owner's UID
+    //   - symbols: list (required, max 50) - List of ticker symbols
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.uid;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "adityahait2006@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUrl(url) {
+      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'photoURL', 'createdAt', 'role']) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email) &&
+             (data.displayName == null || (data.displayName is string && data.displayName.size() < 100)) &&
+             (data.photoURL == null || isValidUrl(data.photoURL));
+    }
+
+    function isValidPortfolio(data) {
+      return hasOnlyAllowedFields(['uid', 'cash', 'positions', 'isPaper']) &&
+             data.uid == request.auth.uid &&
+             data.cash is number && data.cash >= 0 &&
+             data.positions is map &&
+             data.isPaper is bool;
+    }
+
+    function isValidWatchlist(data) {
+      return hasOnlyAllowedFields(['uid', 'symbols']) &&
+             data.uid == request.auth.uid &&
+             data.symbols is list && data.symbols.size() <= 50;
+    }
+
+    // ===============================================================
+    // Match Rules
+    // ===============================================================
+
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid) && isValidUser(request.resource.data) && (!('role' in request.resource.data) || request.resource.data.role == 'user');
+      allow update: if isOwner(uid) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
+    }
+
+    match /portfolios/{portfolioId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isAuthenticated() && isValidPortfolio(request.resource.data);
+      allow update: if isDocOwner() && isValidPortfolio(request.resource.data) && request.resource.data.isPaper == resource.data.isPaper;
+      allow delete: if isDocOwner();
+    }
+
+    match /watchlists/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create, update: if isOwner(uid) && isValidWatchlist(request.resource.data);
+    }
+
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}
